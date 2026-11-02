@@ -1453,7 +1453,22 @@ setup.loadCheckpoint = async function (slot, options) {
     const feedback = document.querySelector('.checkpoint-feedback');
 
     try {
+        const slotInfo = Save.browser.slot.get(slot);
+        const expectedPassage = slotInfo && slotInfo.metadata && slotInfo.metadata.passage;
         await Save.browser.slot.load(slot);
+
+        // 某些旧版/嵌入式浏览器会恢复变量但不完成 SugarCube 的段落导航。
+        // 用存档元数据明确跳到原段落，确保“继续”与“读取”产生可见的场景切换。
+        if (expectedPassage && State.passage !== expectedPassage) {
+            if (!Story.has(expectedPassage)) {
+                throw new Error(`存档目标段落不存在：${expectedPassage}`);
+            }
+            Engine.play(expectedPassage);
+        }
+
+        if (expectedPassage && State.passage !== expectedPassage) {
+            throw new Error(`已读取存档，但未能跳转到：${expectedPassage}`);
+        }
         setup.replayFromSlot = slot;
         return true;
     } catch (error) {
@@ -1942,6 +1957,10 @@ $(document).on('click', '#checkpoint-menu-button, #title-checkpoint-button', fun
 
 $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', function () {
     const button = this;
+    // “选择存档”弹窗中的继续按钮必须先移除遮罩，否则遮罩会盖住已恢复的剧情页。
+    if (Dialog.isOpen()) {
+        Dialog.close();
+    }
     button.disabled = true;
     button.textContent = '正在读取存档…';
     setup.continueLatestCheckpoint().then((loaded) => {
@@ -1971,6 +1990,10 @@ $(document).on('click', '#start-night-two-button', function () {
 
 $(document).on('click', '.checkpoint-entry, .manual-load-button', function () {
     const button = this;
+    // 读取前先关闭原生对话框，防止其全屏遮罩留在目标剧情上方拦截点击。
+    if (Dialog.isOpen()) {
+        Dialog.close();
+    }
     button.disabled = true;
     setup.loadCheckpoint(Number(button.dataset.checkpointSlot)).then((loaded) => {
         if (!loaded && button.isConnected) {
