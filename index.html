@@ -547,6 +547,92 @@ a:hover,
     color: #fff6dc;
 }
 
+.drawer-code-label {
+    display: block;
+    margin-top: 1.3rem;
+    color: #d8cfbb;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 0.9rem;
+}
+
+.drawer-code-row {
+    display: flex;
+    gap: 0.65rem;
+    align-items: stretch;
+    max-width: 28rem;
+    margin-top: 0.45rem;
+}
+
+.drawer-code-row br {
+    display: none;
+}
+
+input.drawer-code-input {
+    width: 9rem;
+    min-width: 0;
+    flex: 0 1 9rem;
+    box-sizing: border-box;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #69685f;
+    border-radius: 2px;
+    color: #eee5d1;
+    background: #101210;
+    font: 600 1.2rem/1.2 Consolas, "Microsoft YaHei", monospace;
+    letter-spacing: 0.18em;
+    text-align: center;
+}
+
+.drawer-code-input:focus-visible {
+    outline: 2px solid var(--red-bright);
+    outline-offset: 2px;
+}
+
+.drawer-code-submit {
+    width: auto;
+    min-width: 6rem;
+    margin: 0;
+    text-align: center;
+}
+
+.drawer-code-feedback {
+    min-height: 1.6em;
+    margin: 0.4rem 0;
+    color: #d37a72;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 0.82rem;
+}
+
+.harbor-archive {
+    margin: 1.25rem 0;
+    border: 1px solid #53615b;
+    background: #141a18;
+}
+
+.harbor-archive-header {
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid #38423d;
+    color: #b3c1b2;
+    background: #1d2520;
+    font-family: Consolas, "Microsoft YaHei", monospace;
+    font-size: 0.84rem;
+}
+
+.harbor-archive-body {
+    padding: 0.95rem;
+    color: #c8c9b7;
+    font-family: Consolas, "Microsoft YaHei", monospace;
+    font-size: 0.84rem;
+}
+
+.harbor-archive-body a {
+    color: #b0c29e;
+}
+
+.harbor-archive-body a:hover,
+.harbor-archive-body a:focus-visible {
+    color: #f1edcf;
+}
+
 .item-visual {
     position: relative;
     margin: 1.5rem 0 2rem;
@@ -585,6 +671,15 @@ a:hover,
     .evidence-log {
         min-width: 0;
         padding: 1rem;
+    }
+
+    .drawer-code-row {
+        width: 100%;
+    }
+
+    input.drawer-code-input {
+        width: 7.5rem;
+        flex-basis: 7.5rem;
     }
 
     #ui-dialog-body.evidence-dialog {
@@ -686,6 +781,18 @@ setup.evidenceDetails = {
     'N-0011管理员登记表': {
         category: '禁区记录',
         description: '禁区登记表显示，上一任管理员曾以N-0011的编号被当作“失物”记录。'
+    },
+    '打字机底下的铜钥匙': {
+        category: '物证',
+        description: '藏在柜台打字机底下，钥匙圈缠着写有陈启山名字的旧蓝纸带。'
+    },
+    '老许提到的蓝纸乘客': {
+        category: '证词',
+        description: '夜班清洁工记得，事故当晚有个维修工手腕缠蓝纸，下车后托人保管东西。'
+    },
+    '旧港区网页上的人数差额': {
+        category: '档案',
+        description: '本地网页保存着原始两名乘客、归档后一名乘客的差异，和被撕去的更正单编号。'
     }
 };
 
@@ -801,6 +908,45 @@ $(document).on('click', '.evidence-log-close', function () {
     setup.playInterfaceTone(430);
 });
 
+/**
+ * Validate the drawer code locally.  A wrong attempt gives an in-world clue
+ * without consuming investigation resources; the physical-key route remains
+ * available to players who do not inspect the accident date.
+ */
+setup.tryDrawerCode = function () {
+    const input = document.getElementById('drawer-code-input');
+    const feedback = document.getElementById('drawer-code-feedback');
+    if (!input || !feedback) {
+        return;
+    }
+
+    const code = input.value.trim();
+    if (!/^\d{4}$/.test(code)) {
+        feedback.textContent = '需要四位数字。';
+        input.focus();
+        return;
+    }
+
+    if (code === '0717') {
+        State.variables.drawerUnlockedByCode = true;
+        Engine.play('EmergencyDrawer');
+        return;
+    }
+
+    State.variables.drawerCodeAttempts += 1;
+    feedback.textContent = '密码轮轻轻弹回。便笺写的是“出事那天”，不是那辆车的编号。';
+    input.value = '';
+    input.focus();
+};
+
+$(document).on('click', '#drawer-code-submit', setup.tryDrawerCode);
+$(document).on('keydown', '#drawer-code-input', function (event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        setup.tryDrawerCode();
+    }
+});
+
 // Use event delegation because SugarCube replaces passage links on navigation.
 $(document).on('click', 'a.link-internal, button.choice-button', function () {
     setup.playInterfaceTone(390);
@@ -827,6 +973,13 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $caseScore to 0&gt;&gt;
 &lt;&lt;set $confrontationResult to &quot;未进行&quot;&gt;&gt;
 &lt;&lt;set $emergencyChoice to &quot;&quot;&gt;&gt;
+&lt;&lt;set $drawerCodeAttempts to 0&gt;&gt;
+&lt;&lt;set $drawerUnlockedByCode to false&gt;&gt;
+&lt;&lt;set $drawerUnlockedByKey to false&gt;&gt;
+&lt;&lt;set $drawerFromEmergency to false&gt;&gt;
+&lt;&lt;set $drawerOpened to false&gt;&gt;
+&lt;&lt;set $clerkCallHeard to false&gt;&gt;
+&lt;&lt;set $harborArchiveRead to false&gt;&gt;
 &lt;&lt;set $anchorKnown to false&gt;&gt;
 &lt;&lt;set $ownerDecision to &quot;&quot;&gt;&gt;
 &lt;&lt;set $disposition to &quot;&quot;&gt;&gt;
@@ -891,9 +1044,25 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;quote system-copy&quot;&gt;夜班管理员已到岗。第一件失物将在 02:13 送达。请保持柜台整洁。&lt;/div&gt;
 
+&lt;p&gt;签字笔旁压着一张折过几次的便笺，纸边粘着蓝黑色的色带灰。&lt;/p&gt;
+
 &lt;div class=&quot;choice-list&quot;&gt;
+    [[翻看打字机旁的旧便笺-&gt;TypewriterNote]]
     [[等待传送窗口开启-&gt;ItemIntake]]
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="6" name="ItemIntake" tags="" position="725,100" size="100,100">&lt;&lt;set $shiftTime to &quot;02:13&quot;&gt;&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="6" name="TypewriterNote" tags="" position="725,100" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;柜台记录 / 前任留下的字&lt;/div&gt;
+&lt;h2&gt;碳纸上的一句话&lt;/h2&gt;
+
+这张便笺被打字机压在最底下。字母深浅不一，像是打到一半时有人停下来换了色带。
+
+&lt;div class=&quot;file-card system-copy&quot;&gt;“三号抽屉的锁没换。密码还是出事那天。钥匙我先藏起来，免得他们拿走。”&lt;/div&gt;
+
+纸背有一小块被水洇开的字，只剩“长宁路”和一个电话号码。号码还能辨认，你把它抄在手套上。
+
+这不像正式交接。更像有人知道自己不会回来，临走前匆匆留了两件事：一个日期，一把钥匙。
+
+&lt;div class=&quot;choice-list&quot;&gt;
+    [[先记下，再去接收失物-&gt;ItemIntake]]
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="7" name="ItemIntake" tags="" position="850,100" size="100,100">&lt;&lt;set $shiftTime to &quot;02:13&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;失物接收 / N-0001&lt;/div&gt;
 &lt;h2&gt;红色长柄雨伞&lt;/h2&gt;
 
@@ -928,7 +1097,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;choice-list&quot;&gt;
     [[先对失物进行物证勘验-&gt;InspectionHub]]
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="7" name="InspectionHub" tags="" position="850,100" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;物证勘验 / 剩余 $inspectionCredits 次&lt;/div&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="8" name="InspectionHub" tags="" position="975,100" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;物证勘验 / 剩余 $inspectionCredits 次&lt;/div&gt;
 &lt;h2&gt;检查红色雨伞&lt;/h2&gt;
 
 夜班手册要求你在申请人到场前完成初检。紫外灯、棉签、放大镜和一台老式磁带记录仪整齐地放在柜台下，但你的临时权限只允许登记三项发现。
@@ -949,7 +1118,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;if $inspections.length &gt; 0&gt;&gt;[[结束勘验，开启关联档案-&gt;ArchiveHub]]&lt;&lt;/if&gt;&gt;
 &lt;/div&gt;
 
-&lt;&lt;if $inspectionCredits === 0&gt;&gt;&lt;p class=&quot;warning-copy&quot;&gt;三张物证标签已经用完。未登记项目将保持原状。&lt;/p&gt;&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="8" name="InspectStrap" tags="" position="975,100" size="100,100">&lt;&lt;if !$inspections.includes(&quot;strap&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;strap&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;束带夹层的车票纤维&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $inspectionCredits === 0&gt;&gt;&lt;p class=&quot;warning-copy&quot;&gt;三张物证标签已经用完。未登记项目将保持原状。&lt;/p&gt;&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="9" name="InspectStrap" tags="" position="1100,100" size="100,100">&lt;&lt;if !$inspections.includes(&quot;strap&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;strap&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;束带夹层的车票纤维&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;物证 01 / 束带&lt;/div&gt;
 &lt;h2&gt;不属于雨伞的纸&lt;/h2&gt;
 
@@ -964,7 +1133,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：束带夹层的车票纤维&lt;/div&gt;
 &lt;&lt;set $truth += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="9" name="InspectHandle" tags="" position="1100,100" size="100,100">&lt;&lt;if !$inspections.includes(&quot;handle&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;handle&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;伞柄内侧的L·Y刻痕&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="10" name="InspectHandle" tags="" position="1225,100" size="100,100">&lt;&lt;if !$inspections.includes(&quot;handle&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;handle&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;伞柄内侧的L·Y刻痕&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;物证 02 / 伞柄&lt;/div&gt;
 &lt;h2&gt;两枚被磨平的字母&lt;/h2&gt;
 
@@ -976,7 +1145,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：伞柄内侧的L·Y刻痕&lt;/div&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="10" name="InspectWater" tags="" position="1225,100" size="100,100">&lt;&lt;if !$inspections.includes(&quot;water&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;water&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;不属于雨水的盐水&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="11" name="InspectWater" tags="" position="100,225" size="100,100">&lt;&lt;if !$inspections.includes(&quot;water&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;water&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;不属于雨水的盐水&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;物证 03 / 水样&lt;/div&gt;
 &lt;h2&gt;海水留下的结晶&lt;/h2&gt;
 
@@ -989,7 +1158,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：不属于雨水的盐水&lt;/div&gt;
 &lt;&lt;set $pollution += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="11" name="InspectShadow" tags="" position="100,225" size="100,100">&lt;&lt;if !$inspections.includes(&quot;shadow&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;shadow&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;方向相反的第二道伞影&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="12" name="InspectShadow" tags="" position="225,225" size="100,100">&lt;&lt;if !$inspections.includes(&quot;shadow&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;shadow&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;方向相反的第二道伞影&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;物证 04 / 阴影&lt;/div&gt;
 &lt;h2&gt;柜台上有两把伞&lt;/h2&gt;
 
@@ -1004,7 +1173,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：方向相反的第二道伞影&lt;/div&gt;
 &lt;&lt;set $truth += 1&gt;&gt;&lt;&lt;set $pollution += 2&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="12" name="InspectMechanism" tags="" position="225,225" size="100,100">&lt;&lt;if !$inspections.includes(&quot;mechanism&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;mechanism&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;修补过的第三节伞骨&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="13" name="InspectMechanism" tags="" position="350,225" size="100,100">&lt;&lt;if !$inspections.includes(&quot;mechanism&quot;)&gt;&gt;&lt;&lt;run $inspections.push(&quot;mechanism&quot;)&gt;&gt;&lt;&lt;set $inspectionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;修补过的第三节伞骨&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;物证 05 / 伞骨&lt;/div&gt;
 &lt;h2&gt;拒绝完全打开&lt;/h2&gt;
 
@@ -1016,7 +1185,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：修补过的第三节伞骨&lt;/div&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="13" name="ArchiveHub" tags="" position="350,225" size="100,100">&lt;&lt;set $shiftTime to &quot;02:22&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回物证台-&gt;InspectionHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="14" name="ArchiveHub" tags="" position="475,225" size="100,100">&lt;&lt;set $shiftTime to &quot;02:22&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;档案调阅 / 剩余 $archiveCredits 次&lt;/div&gt;
 &lt;h2&gt;关联记录&lt;/h2&gt;
 
@@ -1032,12 +1201,14 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;if $archiveCredits &gt; 0 and !$archivesViewed.includes(&quot;receipt&quot;)&gt;&gt;[[B｜雨伞购买记录与物证照片-&gt;ArchiveReceipt]]&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archiveCredits &gt; 0 and !$archivesViewed.includes(&quot;camera&quot;)&gt;&gt;[[C｜公交站夜间监控摘要-&gt;ArchiveCamera]]&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archiveCredits &gt; 0 and !$archivesViewed.includes(&quot;missing&quot;)&gt;&gt;[[D｜同夜失踪人员与线路日志-&gt;ArchiveMissing]]&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $archivesViewed.includes(&quot;missing&quot;) and !$clerkCallHeard&gt;&gt;[[回拨便笺上的号码-&gt;ClerkCall]]&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $archivesViewed.includes(&quot;missing&quot;) and !$harborArchiveRead&gt;&gt;[[打开线路日志上被划掉的网址-&gt;HarborArchiveSite]]&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archivesViewed.length &gt; 0&gt;&gt;[[结束调阅，接待申请人-&gt;Applicants]]&lt;&lt;/if&gt;&gt;
 &lt;/div&gt;
 
 &lt;&lt;if $archiveCredits === 0&gt;&gt;
 &lt;p class=&quot;warning-copy&quot;&gt;系统提示：本夜班档案调阅权限已经用尽。&lt;/p&gt;
-&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="14" name="ArchiveAccident" tags="" position="475,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;accident&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;accident&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;事故遗物清单没有雨伞&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="15" name="ArchiveAccident" tags="" position="600,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;accident&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;accident&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;事故遗物清单没有雨伞&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;关联档案 A / 已调阅&lt;/div&gt;
 &lt;h2&gt;长宁路交通事故报告&lt;/h2&gt;
 
@@ -1062,7 +1233,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $truth += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="15" name="ArchiveReceipt" tags="" position="600,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;receipt&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;receipt&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;写有赠言的购买收据&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="16" name="ArchiveReceipt" tags="" position="725,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;receipt&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;receipt&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;写有赠言的购买收据&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;关联档案 B / 已调阅&lt;/div&gt;
 &lt;h2&gt;购买记录与物证照片&lt;/h2&gt;
 
@@ -1084,7 +1255,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $trust += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="16" name="ArchiveCamera" tags="" position="725,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;camera&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;camera&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;连续七夜的02:13影像&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="17" name="ArchiveCamera" tags="" position="850,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;camera&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;camera&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;连续七夜的02:13影像&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;关联档案 C / 已调阅&lt;/div&gt;
 &lt;h2&gt;公交站夜间监控摘要&lt;/h2&gt;
 
@@ -1107,7 +1278,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：连续七夜的02:13影像&lt;/div&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="17" name="ArchiveMissing" tags="" position="850,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;missing&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;missing&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;被覆盖的末班车线路日志&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="18" name="ArchiveMissing" tags="" position="975,225" size="100,100">&lt;&lt;if !$archivesViewed.includes(&quot;missing&quot;)&gt;&gt;&lt;&lt;run $archivesViewed.push(&quot;missing&quot;)&gt;&gt;&lt;&lt;set $archiveCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;被覆盖的末班车线路日志&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;关联档案 D / 已调阅&lt;/div&gt;
 &lt;h2&gt;同夜失踪人员与线路日志&lt;/h2&gt;
 
@@ -1126,10 +1297,108 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;quote&quot;&gt;“该座乘客下车时，请勿替他保管随身物品。”&lt;/div&gt;
 
+日志最后附了一张过期的维修工单。网址被人用笔划掉一半，下面还留着旧港区档案室的地址：
+
+&lt;div class=&quot;file-card system-copy&quot;&gt;旧港区线路事故互助档案&lt;br&gt;dock7.archive.local&lt;br&gt;公开查询已关闭&lt;/div&gt;
+
+你抄下地址。纸的另一面写着：“清洁员老许知道那晚谁回来过。”号码和打字机旁便笺上的一致。
+
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：被覆盖的末班车线路日志&lt;/div&gt;
 &lt;&lt;set $truth += 2&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[返回档案目录-&gt;ArchiveHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="18" name="Applicants" tags="" position="975,225" size="100,100">&lt;&lt;set $shiftTime to &quot;02:31&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;
+    [[拨打便笺上的号码-&gt;ClerkCall]]
+    [[打开旧港区档案网站-&gt;HarborArchiveSite]]
+    [[返回档案目录-&gt;ArchiveHub]]
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="19" name="ClerkCall" tags="" position="1100,225" size="100,100">&lt;&lt;if !$clerkCallHeard&gt;&gt;&lt;&lt;set $clerkCallHeard to true&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;if !$evidence.includes(&quot;老许提到的蓝纸乘客&quot;)&gt;&gt;&lt;&lt;run $evidence.push(&quot;老许提到的蓝纸乘客&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;eyebrow&quot;&gt;呼出电话 / 长宁路夜班清洁&lt;/div&gt;
+&lt;h2&gt;老许还没睡&lt;/h2&gt;
+
+电话响到第四声才接通。对面先传来水龙头的声音，随后是一个男人压低的嗓音。
+
+&lt;div class=&quot;quote&quot;&gt;“你们那边又收到那把伞了？”&lt;/div&gt;
+
+你只说自己是新来的。他没问你从哪间办公室打来，电话里安静了片刻，才说三年前那晚他在站台边扫到天亮。女孩倒下以后，司机没有走。一个穿维修服的人从车里下来，手上缠着蓝纸，问他能不能替他保管一样东西。
+
+“我没敢收。”老许说，“后来有人替他收了。你们柜台那台旧打字机，底下粘着的东西，可能还在。”
+
+他没说是谁把东西放回去，也没问你是谁。挂电话前只补了一句：
+
+&lt;div class=&quot;quote&quot;&gt;“别写我名字。我孙女还在那边上学。”&lt;/div&gt;
+
+&lt;p&gt;通话记录已经留下。老许的话不能证明那个人是谁，但“蓝纸”和十三号座终于出现在同一条口述里。&lt;/p&gt;
+
+&lt;div class=&quot;choice-list&quot;&gt;
+    [[检查打字机底部-&gt;DeskKey]]
+    [[回到档案目录-&gt;ArchiveHub]]
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="20" name="DeskKey" tags="" position="1225,225" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;柜台检查 / 打字机底部&lt;/div&gt;
+&lt;h2&gt;胶带下的铜钥匙&lt;/h2&gt;
+
+打字机沉得抬不起来。你把登记簿垫到一边，用指尖沿着底板摸过去，碰到一截翘起的布胶带。
+
+胶带下粘着一把小铜钥匙。齿口被磨得发亮，钥匙圈上绕着一条褪色的蓝纸带。纸带内侧有个被水泡淡的名字：陈启山。
+
+你把钥匙放进证物袋。它不是正式交接的一部分，至少现在还不能说明上一任管理员为什么要藏它。
+
+&lt;&lt;if !$evidence.includes(&quot;打字机底下的铜钥匙&quot;)&gt;&gt;&lt;&lt;run $evidence.push(&quot;打字机底下的铜钥匙&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;evidence-found&quot;&gt;获得证据：打字机底下的铜钥匙&lt;/div&gt;
+
+&lt;div class=&quot;choice-list&quot;&gt;
+    [[返回档案目录-&gt;ArchiveHub]]
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="21" name="HarborArchiveSite" tags="" position="100,350" size="100,100">&lt;&lt;set $harborArchiveRead to true&gt;&gt;
+&lt;&lt;if !$evidence.includes(&quot;旧港区网页上的人数差额&quot;)&gt;&gt;&lt;&lt;run $evidence.push(&quot;旧港区网页上的人数差额&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;eyebrow&quot;&gt;本地网页 / 旧港区档案互助站&lt;/div&gt;
+&lt;h2&gt;已停止更新的事故索引&lt;/h2&gt;
+
+&lt;section class=&quot;harbor-archive&quot;&gt;
+&lt;header class=&quot;harbor-archive-header&quot;&gt;港区线路互助档案　/　缓存副本　/　最后更新：三年前&lt;/header&gt;
+&lt;div class=&quot;harbor-archive-body&quot;&gt;
+旧网页在本地缓存里打开。页面没有图片，只有一张窄窄的索引表。最上面标着“非官方副本，原站于三年前关闭”。
+
+&lt;div class=&quot;file-card system-copy&quot;&gt;
+&lt;strong&gt;记录日期：&lt;/strong&gt;7月17日&lt;br&gt;
+&lt;strong&gt;线路：&lt;/strong&gt;归潮末班车&lt;br&gt;
+&lt;strong&gt;站点：&lt;/strong&gt;长宁路17号&lt;br&gt;
+&lt;strong&gt;报修人员：&lt;/strong&gt;陈启山&lt;br&gt;
+&lt;strong&gt;乘客人数：&lt;/strong&gt;原始记录为2，归档后为1&lt;br&gt;
+&lt;strong&gt;备注：&lt;/strong&gt;纸质更正单编号 N-0011，签收人栏被撕去
+&lt;/div&gt;
+
+页面底部有一条旧留言，作者只留下姓氏：
+
+&lt;div class=&quot;quote&quot;&gt;“那晚不是多出一个乘客，是少记了一个人。车回来时，司机座是空的。”&lt;/div&gt;
+
+这条记录没有解释陈启山去了哪里。它只留下一个对不上的数字：两个人上车，档案里只剩一个。
+&lt;/div&gt;
+&lt;/section&gt;
+
+&lt;div class=&quot;choice-list&quot;&gt;
+    [[记下页面内容，返回档案目录-&gt;ArchiveHub]]
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="22" name="DrawerLock" tags="" position="225,350" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;柜台下方 / 第三个抽屉&lt;/div&gt;
+&lt;h2&gt;锁没有换，记录却被撕走了&lt;/h2&gt;
+
+抽屉正面装着一把旧密码锁，旁边还有个被胶带盖住的钥匙孔。锁面有四个数字轮，最右侧的轮子卡在“3”与“4”之间。
+
+&lt;&lt;if $evidence.includes(&quot;打字机底下的铜钥匙&quot;)&gt;&gt;&lt;&lt;set $drawerUnlockedByKey to true&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $drawerUnlockedByKey&gt;&gt;
+&lt;p&gt;你把胶带下找到的铜钥匙插入钥匙孔。锁芯先涩了一下，随后转开。&lt;/p&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[用铜钥匙打开第三个抽屉-&gt;EmergencyDrawer]]&lt;/div&gt;
+&lt;&lt;else&gt;&gt;
+&lt;p&gt;打字机便笺说密码是“出事那天”。事故报告和旧网页上都有日期。你需要把月份和日期合成四位数。&lt;/p&gt;
+
+&lt;label class=&quot;drawer-code-label&quot; for=&quot;drawer-code-input&quot;&gt;输入四位密码&lt;/label&gt;
+&lt;div class=&quot;drawer-code-row&quot;&gt;
+    &lt;input id=&quot;drawer-code-input&quot; class=&quot;drawer-code-input&quot; type=&quot;text&quot; inputmode=&quot;numeric&quot; maxlength=&quot;4&quot; autocomplete=&quot;off&quot; aria-describedby=&quot;drawer-code-feedback&quot;&gt;
+    &lt;button id=&quot;drawer-code-submit&quot; class=&quot;choice-button drawer-code-submit&quot; type=&quot;button&quot;&gt;试一下&lt;/button&gt;
+&lt;/div&gt;
+&lt;p id=&quot;drawer-code-feedback&quot; class=&quot;drawer-code-feedback&quot; aria-live=&quot;polite&quot;&gt;&lt;&lt;if $drawerCodeAttempts &gt; 0&gt;&gt;轮子弹回了原处。还差一个日期。&lt;&lt;/if&gt;&gt;&lt;/p&gt;
+
+&lt;div class=&quot;choice-list&quot;&gt;
+&lt;&lt;if $clerkCallHeard and !$evidence.includes(&quot;打字机底下的铜钥匙&quot;)&gt;&gt;[[沿着老许说的位置找钥匙-&gt;DeskKey]]&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $drawerFromEmergency&gt;&gt;[[先稳住雨伞，离开抽屉-&gt;EmergencySeal]]&lt;&lt;else&gt;&gt;[[暂时不动抽屉，返回失主认定-&gt;OwnershipDecision]]&lt;&lt;/if&gt;&gt;
+&lt;/div&gt;
+&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="23" name="Applicants" tags="" position="350,350" size="100,100">&lt;&lt;set $shiftTime to &quot;02:31&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;失物申请 / 02:31&lt;/div&gt;
 &lt;h2&gt;三名申请人&lt;/h2&gt;
 
@@ -1157,7 +1426,7 @@ $(document).on(':passagedisplay', function () {
 
 林小雨则一直盯着你胸前的员工证，像是在核对什么。
 
-&lt;div class=&quot;choice-list&quot;&gt;[[开始询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="19" name="InterviewHub" tags="" position="1100,225" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;证词核对 / 剩余 $questionCredits 次&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[开始询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="24" name="InterviewHub" tags="" position="475,350" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;证词核对 / 剩余 $questionCredits 次&lt;/div&gt;
 &lt;h2&gt;询问申请人&lt;/h2&gt;
 
 记录仪允许四次重点询问。问题不会重复，但你不可能听完所有人的完整故事。
@@ -1194,7 +1463,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;if $questionsAsked.length &gt;= 2&gt;&gt;
 &lt;div class=&quot;choice-list&quot;&gt;[[结束询问，整理证据板-&gt;EvidenceBoard]]&lt;/div&gt;
-&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="20" name="QuestionAOwner" tags="" position="1225,225" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-owner&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-owner&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;林小雨对旧伤位置的描述&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;/if&gt;&gt;</tw-passagedata><tw-passagedata pid="25" name="QuestionAOwner" tags="" position="600,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-owner&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-owner&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;林小雨对旧伤位置的描述&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 林小雨&lt;/div&gt;
 &lt;h2&gt;“你如何证明雨伞属于你？”&lt;/h2&gt;
 
@@ -1212,7 +1481,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $trust += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="21" name="QuestionAAdmin" tags="" position="100,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-admin&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-admin&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="26" name="QuestionAAdmin" tags="" position="725,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-admin&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-admin&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 林小雨&lt;/div&gt;
 &lt;h2&gt;“你为什么一直看我的员工证？”&lt;/h2&gt;
 
@@ -1234,7 +1503,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $truth += 2&gt;&gt;&lt;&lt;set $violations += 1&gt;&gt;&lt;&lt;set $pollution += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="22" name="QuestionANight" tags="" position="225,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-night&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-night&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;林小雨缺失的十三分钟&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="27" name="QuestionANight" tags="" position="850,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;a-night&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;a-night&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;林小雨缺失的十三分钟&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 林小雨&lt;/div&gt;
 &lt;h2&gt;“事故那晚，你最后记得什么？”&lt;/h2&gt;
 
@@ -1251,7 +1520,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：林小雨缺失的十三分钟&lt;/div&gt;
 &lt;&lt;set $truth += 1&gt;&gt;&lt;&lt;set $pollution += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="23" name="QuestionBSee" tags="" position="350,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-see&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-see&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;周兰承认能看见女儿&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="28" name="QuestionBSee" tags="" position="975,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-see&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-see&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;周兰承认能看见女儿&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 周兰&lt;/div&gt;
 &lt;h2&gt;“你看不见站在旁边的女孩吗？”&lt;/h2&gt;
 
@@ -1269,7 +1538,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $truth += 1&gt;&gt;&lt;&lt;set $trust += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="24" name="QuestionBBurn" tags="" position="475,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-burn&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-burn&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="29" name="QuestionBBurn" tags="" position="1100,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-burn&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-burn&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 周兰&lt;/div&gt;
 &lt;h2&gt;“你拿回雨伞以后准备做什么？”&lt;/h2&gt;
 
@@ -1285,7 +1554,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $trust += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="25" name="QuestionBHusband" tags="" position="600,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-husband&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-husband&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;周兰丈夫留下的语音&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="30" name="QuestionBHusband" tags="" position="1225,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;b-husband&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;b-husband&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;周兰丈夫留下的语音&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 周兰&lt;/div&gt;
 &lt;h2&gt;“你丈夫为什么也失踪了？”&lt;/h2&gt;
 
@@ -1302,7 +1571,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：周兰丈夫留下的语音&lt;/div&gt;
 &lt;&lt;set $trust += 1&gt;&gt;&lt;&lt;set $truth += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="26" name="QuestionCNow" tags="" position="725,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-now&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-now&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;陈启明关于第二道影子的说法&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="31" name="QuestionCNow" tags="" position="100,475" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-now&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-now&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;run $evidence.push(&quot;陈启明关于第二道影子的说法&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 陈启明&lt;/div&gt;
 &lt;h2&gt;“‘至少现在不是’是什么意思？”&lt;/h2&gt;
 
@@ -1318,7 +1587,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $truth += 1&gt;&gt;&lt;&lt;set $pollution += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="27" name="QuestionCPassenger" tags="" position="850,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-passenger&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-passenger&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="32" name="QuestionCPassenger" tags="" position="225,475" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-passenger&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-passenger&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 陈启明&lt;/div&gt;
 &lt;h2&gt;“你想用雨伞找回谁？”&lt;/h2&gt;
 
@@ -1332,7 +1601,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;&lt;set $trust += 1&gt;&gt;&lt;&lt;set $pollution += 1&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="28" name="QuestionCLog" tags="" position="975,350" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-log&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-log&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="33" name="QuestionCLog" tags="" position="350,475" size="100,100">&lt;&lt;if !$questionsAsked.includes(&quot;c-log&quot;)&gt;&gt;&lt;&lt;run $questionsAsked.push(&quot;c-log&quot;)&gt;&gt;&lt;&lt;set $questionCredits -= 1&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;询问记录 / 陈启明&lt;/div&gt;
 &lt;h2&gt;“为什么线路日志被改成你的名字？”&lt;/h2&gt;
 
@@ -1361,7 +1630,7 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：陈启明篡改排班表的承认&lt;/div&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="29" name="EvidenceBoard" tags="" position="1100,350" size="100,100">&lt;&lt;set $shiftTime to &quot;02:58&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[继续询问-&gt;InterviewHub]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="34" name="EvidenceBoard" tags="" position="475,475" size="100,100">&lt;&lt;set $shiftTime to &quot;02:58&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;案情复盘 / 证据 $evidence.length 项&lt;/div&gt;
 &lt;h2&gt;把事实钉到同一块板上&lt;/h2&gt;
 
@@ -1378,7 +1647,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;link &quot;假设二｜雨伞只是媒介，真正的异常藏在束带或第二道影子里&quot;&gt;&gt;&lt;&lt;set $caseTheory to &quot;异常锚点&quot;&gt;&gt;&lt;&lt;goto &quot;ConfrontAnchor&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;假设三｜周兰看得见女儿，她申请雨伞是为了阻止更多人失踪&quot;&gt;&gt;&lt;&lt;set $caseTheory to &quot;母亲隐瞒&quot;&gt;&gt;&lt;&lt;goto &quot;ConfrontMother&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;假设四｜陈启明篡改过记录，他并非单纯的旁观者&quot;&gt;&gt;&lt;&lt;set $caseTheory to &quot;司机隐瞒&quot;&gt;&gt;&lt;&lt;goto &quot;ConfrontDriver&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="30" name="ConfrontOwnership" tags="" position="1225,350" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 林小雨与周兰&lt;/div&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="35" name="ConfrontOwnership" tags="" position="600,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 林小雨与周兰&lt;/div&gt;
 &lt;h2&gt;谁付款，谁就拥有吗？&lt;/h2&gt;
 
 你让母女两人同时回到窗口，把“购买”和“赠与”分开写在两张登记纸上。
@@ -1407,7 +1676,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $trust -= 1&gt;&gt;&lt;&lt;set $confrontationResult to &quot;赠与关系证据不足&quot;&gt;&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="31" name="ConfrontAnchor" tags="" position="100,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 异常来源&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="36" name="ConfrontAnchor" tags="" position="725,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 异常来源&lt;/div&gt;
 &lt;h2&gt;雨伞究竟保管着什么？&lt;/h2&gt;
 
 你没有问谁拥有雨伞，而是把问题改成：为什么一件普通赠物会召回不存在的公交车？
@@ -1438,7 +1707,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $pollution += 1&gt;&gt;&lt;&lt;set $confrontationResult to &quot;异常锚点证据不足&quot;&gt;&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="32" name="ConfrontMother" tags="" position="225,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 周兰&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="37" name="ConfrontMother" tags="" position="850,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 周兰&lt;/div&gt;
 &lt;h2&gt;“那里没有人”&lt;/h2&gt;
 
 你指出，周兰每次说“看不见”时，视线都会准确避开林小雨的脸。她不是看不见，而是在拒绝承认看见。
@@ -1461,7 +1730,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $confrontationResult to &quot;周兰动机尚未证实&quot;&gt;&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="33" name="ConfrontDriver" tags="" position="350,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 陈启明&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="38" name="ConfrontDriver" tags="" position="975,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;正式对质 / 陈启明&lt;/div&gt;
 &lt;h2&gt;被替换的名字&lt;/h2&gt;
 
 你询问陈启明，为什么他知道一辆“从未失踪”的公交车会回来，也为什么公司记录中只有他的名字。
@@ -1484,7 +1753,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $violations += 1&gt;&gt;&lt;&lt;set $trust -= 1&gt;&gt;&lt;&lt;set $confrontationResult to &quot;对司机的指控缺少档案&quot;&gt;&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="34" name="EmergencyEvent" tags="" position="475,475" size="100,100">&lt;&lt;set $shiftTime to &quot;03:13&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[处理突发异常-&gt;EmergencyEvent]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="39" name="EmergencyEvent" tags="" position="1100,475" size="100,100">&lt;&lt;set $shiftTime to &quot;03:13&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;突发事件 / 03:13&lt;/div&gt;
 &lt;h2&gt;束带自行松开&lt;/h2&gt;
 
@@ -1499,8 +1768,8 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;choice-list&quot;&gt;
 &lt;&lt;link &quot;压住束带，重新封紧雨伞&quot;&gt;&gt;&lt;&lt;set $emergencyChoice to &quot;重新封紧&quot;&gt;&gt;&lt;&lt;set $pollution += 1&gt;&gt;&lt;&lt;goto &quot;EmergencySeal&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;冒险撑开一条缝，检查伞布内侧&quot;&gt;&gt;&lt;&lt;set $emergencyChoice to &quot;检查伞内&quot;&gt;&gt;&lt;&lt;set $pollution += 3&gt;&gt;&lt;&lt;set $violations += 1&gt;&gt;&lt;&lt;goto &quot;EmergencyLook&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
-&lt;&lt;link &quot;不碰雨伞，沿水迹打开第三个抽屉&quot;&gt;&gt;&lt;&lt;set $emergencyChoice to &quot;打开抽屉&quot;&gt;&gt;&lt;&lt;set $truth += 3&gt;&gt;&lt;&lt;set $violations += 1&gt;&gt;&lt;&lt;goto &quot;EmergencyDrawer&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="35" name="EmergencySeal" tags="" position="600,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;稳定措施 / 重新封紧&lt;/div&gt;
+&lt;&lt;link &quot;不碰雨伞，沿水迹查看第三个抽屉&quot;&gt;&gt;&lt;&lt;set $emergencyChoice to &quot;查看第三个抽屉&quot;&gt;&gt;&lt;&lt;set $drawerFromEmergency to true&gt;&gt;&lt;&lt;set $truth += 3&gt;&gt;&lt;&lt;set $violations += 1&gt;&gt;&lt;&lt;goto &quot;DrawerLock&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="40" name="EmergencySeal" tags="" position="1225,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;稳定措施 / 重新封紧&lt;/div&gt;
 &lt;h2&gt;有什么在伞里呼吸&lt;/h2&gt;
 
 你隔着防护手套压住松开的伞布。内部传来一下抵抗，像有人从另一侧把手掌贴在伞面上。
@@ -1511,7 +1780,7 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;case-success&quot;&gt;物品已稳定。污染小幅增加，没有新增违规。&lt;/div&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="36" name="EmergencyLook" tags="" position="725,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;违规检查 / 伞布内侧&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="41" name="EmergencyLook" tags="" position="100,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;违规检查 / 伞布内侧&lt;/div&gt;
 &lt;h2&gt;十三号座&lt;/h2&gt;
 
 你把伞撑开不到一个手掌的宽度。
@@ -1529,16 +1798,34 @@ $(document).on(':passagedisplay', function () {
 &lt;div class=&quot;evidence-found&quot;&gt;获得证据：十三号座乘客的直接警告&lt;/div&gt;
 &lt;div class=&quot;case-failure&quot;&gt;代价：高污染，新增一次违规。部分文字可能不再可靠。&lt;/div&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="37" name="EmergencyDrawer" tags="" position="850,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;违规调阅 / 第三个抽屉&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="42" name="EmergencyDrawer" tags="" position="225,600" size="100,100">&lt;&lt;if !$drawerUnlockedByCode and !$drawerUnlockedByKey&gt;&gt;&lt;&lt;goto &quot;DrawerLock&quot;&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;&lt;set $drawerOpened to true&gt;&gt;
+&lt;div class=&quot;eyebrow&quot;&gt;违规调阅 / 第三个抽屉&lt;/div&gt;
 &lt;h2&gt;上一任管理员的工作证&lt;/h2&gt;
 
 你没有碰雨伞，而是顺着水迹拉开第三个抽屉。
 
 里面没有物品，只有一张塑封工作证和十一份被退回的失物登记表。工作证照片被水泡得模糊，姓名栏却和你胸前的一模一样。
 
+&lt;&lt;if $drawerUnlockedByCode&gt;&gt;
+密码锁停在0717。事故日期对上了，但抽屉里最上面的更正单却早于事故报告一天。有人提前知道这份记录会被改写。
+&lt;&lt;elseif $drawerUnlockedByKey&gt;&gt;
+铜钥匙齿口上的蓝纸纤维，和十三号座乘客手腕上的纸带一样。上一任管理员把钥匙藏在打字机底下，显然不希望这份登记表被保管科收走。
+&lt;&lt;/if&gt;&gt;
+
 十一份登记表的物品编号从N-0001排到N-0011。最后一份写着：
 
 &lt;div class=&quot;notice system-copy&quot;&gt;物品名称：夜班管理员&lt;br&gt;发现地点：本处柜台后方&lt;br&gt;原所有者：待确认&lt;br&gt;暂行处置：赋予工作人员身份&lt;/div&gt;
+
+登记表的空白处有一段被水笔来回划过的话。你把纸斜向灯下，还是读出了最后几行：
+
+&lt;div class=&quot;quote&quot;&gt;“事故当晚，归潮末班车有两名乘客离开登记范围。公司把司机姓名改成陈启明，乘客数改成一。林小雨的伞没有进入遗物清单；陈启山的车票却被缝进伞带。此后系统只认得一件遗失物。”&lt;/div&gt;
+
+另一张纸是前任管理员留下的交接记录：
+
+&lt;div class=&quot;file-card system-copy&quot;&gt;“陈启明不是为了钱改名字。他怕弟弟从记录里彻底消失，才把两份失踪并成一份。这样能留下一条回来的路，也把所有后来接手的人困在这间屋里。&lt;br&gt;&lt;br&gt;传送口送来的新员工没有人事档案。别把胸牌当身份证。N-0011是从柜台后面找到的人，不是新聘用的人。”&lt;/div&gt;
+
+你看了看胸前的工作证。传送口、没有同事的入职夜、十一份被退回的登记表，现在排成了同一条线。你不是负责看守这件失物的人，你就是那件一直没能被认领的失物。
 
 抽屉最底部还有上一任管理员留给你的字条：
 
@@ -1549,7 +1836,8 @@ $(document).on(':passagedisplay', function () {
 
 打印机不断发出警告，你把抽屉推回去。红伞已经自行安静下来，像它故意用异常替你争取了这段时间。
 
-&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="38" name="OwnershipDecision" tags="" position="975,475" size="100,100">&lt;&lt;set $shiftTime to &quot;03:26&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[填写归属认定-&gt;OwnershipDecision]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="43" name="OwnershipDecision" tags="" position="350,600" size="100,100">&lt;&lt;set $shiftTime to &quot;03:26&quot;&gt;&gt;
+&lt;&lt;set $drawerFromEmergency to false&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;归属认定 / 必填&lt;/div&gt;
 &lt;h2&gt;这把雨伞真正属于谁？&lt;/h2&gt;
 
@@ -1557,12 +1845,17 @@ $(document).on(':passagedisplay', function () {
 
 &lt;p class=&quot;muted&quot;&gt;归属认定是一项事实判断，不等同于处置决定。&lt;/p&gt;
 
+&lt;&lt;if !$drawerOpened&gt;&gt;
+&lt;div class=&quot;notice&quot;&gt;第三个抽屉还没打开。柜里的登记表可能会改变你对这起事故的判断。&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[回去检查第三个抽屉-&gt;DrawerLock]]&lt;/div&gt;
+&lt;&lt;/if&gt;&gt;
+
 &lt;div class=&quot;choice-list&quot;&gt;
 &lt;&lt;link &quot;A｜林小雨&quot;&gt;&gt;&lt;&lt;set $ownerDecision to &quot;林小雨&quot;&gt;&gt;&lt;&lt;goto &quot;DispositionDecision&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;B｜周兰&quot;&gt;&gt;&lt;&lt;set $ownerDecision to &quot;周兰&quot;&gt;&gt;&lt;&lt;goto &quot;DispositionDecision&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;C｜陈启明&quot;&gt;&gt;&lt;&lt;set $ownerDecision to &quot;陈启明&quot;&gt;&gt;&lt;&lt;goto &quot;DispositionDecision&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;D｜无法认定&quot;&gt;&gt;&lt;&lt;set $ownerDecision to &quot;无法认定&quot;&gt;&gt;&lt;&lt;goto &quot;DispositionDecision&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="39" name="DispositionDecision" tags="" position="1100,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置登记 / 最终确认&lt;/div&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="44" name="DispositionDecision" tags="" position="475,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置登记 / 最终确认&lt;/div&gt;
 &lt;h2&gt;应该怎样处理红色雨伞？&lt;/h2&gt;
 
 &lt;div class=&quot;decision-summary&quot;&gt;
@@ -1586,7 +1879,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;link &quot;扣留｜将雨伞封存在失物处&quot;&gt;&gt;&lt;&lt;set $disposition to &quot;扣留&quot;&gt;&gt;&lt;&lt;goto &quot;RetainResult&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;link &quot;销毁｜启动异常物焚化程序&quot;&gt;&gt;&lt;&lt;set $disposition to &quot;销毁&quot;&gt;&gt;&lt;&lt;goto &quot;DestroyResult&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
 &lt;&lt;if $anchorKnown and $ownerDecision === &quot;林小雨&quot;&gt;&gt;&lt;&lt;link &quot;解除锚点｜剪断束带中的车票，再归还雨伞&quot;&gt;&gt;&lt;&lt;set $disposition to &quot;解除锚点&quot;&gt;&gt;&lt;&lt;goto &quot;SeverResult&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;&lt;&lt;/if&gt;&gt;
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="40" name="ReturnResult" tags="" position="1225,475" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 归还&lt;/div&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="45" name="ReturnResult" tags="" position="600,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 归还&lt;/div&gt;
 
 &lt;&lt;if $ownerDecision === &quot;林小雨&quot;&gt;&gt;
 &lt;h2&gt;她终于等到了雨&lt;/h2&gt;
@@ -1644,7 +1937,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $outcomeSummary to &quot;陈启明没有所有权，但他成功召回了三年前消失的车辆。&quot;&gt;&gt;
 &lt;&lt;/if&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="41" name="RetainResult" tags="" position="100,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 扣留&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="46" name="RetainResult" tags="" position="725,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 扣留&lt;/div&gt;
 &lt;h2&gt;仓库里开始下雨&lt;/h2&gt;
 
 你拒绝把雨伞交给任何人，并在封存袋上贴下新的标签。
@@ -1668,7 +1961,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $outcomeTitle to &quot;扣留：第07号铁柜&quot;&gt;&gt;
 &lt;&lt;set $outcomeSummary to &quot;雨伞仍被封存在失物处。有什么东西已经从仓库里走了出来。&quot;&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="42" name="DestroyResult" tags="" position="225,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 销毁&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="47" name="DestroyResult" tags="" position="850,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;处置结果 / 销毁&lt;/div&gt;
 &lt;h2&gt;正在删除相关记录&lt;/h2&gt;
 
 你按下焚化确认键。
@@ -1692,7 +1985,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $outcomeTitle to &quot;销毁：被遗忘的人&quot;&gt;&gt;
 &lt;&lt;set $outcomeSummary to &quot;异常已经消除。与雨伞相连的人也正在从所有记录中消失。&quot;&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="43" name="SeverResult" tags="" position="350,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;隐藏处置 / 解除锚点&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="48" name="SeverResult" tags="" position="975,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;隐藏处置 / 解除锚点&lt;/div&gt;
 &lt;h2&gt;让失物只属于一个人&lt;/h2&gt;
 
 你拒绝立刻执行归还，也没有把整把伞送进焚化口。
@@ -1723,7 +2016,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;set $outcomeTitle to &quot;解除锚点：各自下车&quot;&gt;&gt;
 &lt;&lt;set $outcomeSummary to &quot;你拆分了被错误合并的失物：雨伞归还林小雨，车票释放陈启山。&quot;&gt;&gt;
 
-&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="44" name="NightReport" tags="checkpoint" position="475,600" size="100,100">&lt;&lt;set $shiftTime to &quot;04:31&quot;&gt;&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[打印夜班报告-&gt;NightReport]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="49" name="NightReport" tags="checkpoint" position="1100,600" size="100,100">&lt;&lt;set $shiftTime to &quot;04:31&quot;&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;第一夜 / 04:31&lt;/div&gt;
 &lt;h2&gt;夜班处置报告&lt;/h2&gt;
 
@@ -1771,7 +2064,7 @@ $(document).on(':passagedisplay', function () {
 
 你以为今晚的工作已经结束，打印机却再次启动。
 
-&lt;div class=&quot;choice-list&quot;&gt;[[读取下一份通知-&gt;DemoEnd]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="45" name="DemoEnd" tags="" position="600,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;第二夜预告 / 04:44&lt;/div&gt;
+&lt;div class=&quot;choice-list&quot;&gt;[[读取下一份通知-&gt;DemoEnd]]&lt;/div&gt;</tw-passagedata><tw-passagedata pid="50" name="DemoEnd" tags="" position="1225,600" size="100,100">&lt;div class=&quot;eyebrow&quot;&gt;第二夜预告 / 04:44&lt;/div&gt;
 &lt;h2&gt;最后一件失物&lt;/h2&gt;
 
 打印机连续吐出三张纸。
