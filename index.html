@@ -1255,6 +1255,23 @@ setup.getManualSaveEntries = function () {
     }));
 };
 
+/** 只有检测到第一夜自动档或第一夜主动档时，才允许从标题接续第二夜。 */
+setup.hasFirstNightSave = function () {
+    if (!Save.browser.slot.isEnabled()) {
+        return false;
+    }
+
+    const hasFirstNightCheckpoint = [0, 1, 2, 3].some((slot) => Save.browser.slot.has(slot));
+    const hasFirstNightManualSave = setup.getManualSaveEntries().some(({ info }) => {
+        if (!info) {
+            return false;
+        }
+        const metadata = info.metadata || {};
+        return !Number.isFinite(metadata.night) || metadata.night === 1;
+    });
+    return hasFirstNightCheckpoint || hasFirstNightManualSave;
+};
+
 /** 统计自动检查点和已有主动存档，用于标题页与侧栏入口。 */
 setup.getAvailableSaveCount = function () {
     const manualCount = setup.getManualSaveEntries().filter(({ info }) => Boolean(info)).length;
@@ -1473,10 +1490,9 @@ setup.updateCheckpointButtons = function () {
             actions.push('<button id="continue-checkpoint-button" class="choice-button" type="button">继续上次进度</button>');
             actions.push('<button id="title-checkpoint-button" class="choice-button secondary-choice" type="button">选择存档</button>');
         }
-        const nightTwoLabel = setup.isNightUnlocked(2)
-            ? '继续游戏（第二夜）'
-            : '继续游戏（接续第二夜）';
-        actions.push(`<button id="start-night-two-button" class="choice-button secondary-choice" type="button">${nightTwoLabel}</button>`);
+        if (setup.hasFirstNightSave()) {
+            actions.push('<button id="start-night-two-button" class="choice-button secondary-choice" type="button">继续游戏（第二夜）</button>');
+        }
         titleActions.innerHTML = actions.join('');
     }
 
@@ -1839,6 +1855,9 @@ $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', fun
 
 // 标题页接续第二夜时只初始化第二夜变量，保留第一夜记录与所有存档。
 $(document).on('click', '#start-night-two-button', function () {
+    if (!setup.hasFirstNightSave()) {
+        return;
+    }
     setup.prepareNightTwo();
     Engine.play('Night2Arrival');
 });
