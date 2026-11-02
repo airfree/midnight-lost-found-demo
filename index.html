@@ -1082,9 +1082,9 @@ input.drawer-code-input {
  * change save behavior or create an excessive history footprint.
  */
 Config.history.maxStates = 80;
-// 第一夜自动档使用0—3，三个主动档继续使用4—6，第二夜自动档使用7—10。
-// 主动档位置保持不变，保证更新前已经保存的记录可以原样读取。
-Config.saves.maxSlotSaves = 11;
+// 第一夜自动档使用0—3，三个主动档继续使用4—6，第二夜自动档使用7—10，
+// 11号槽保存玩家最后离开的具体段落。主动档位置保持不变以兼容旧版本。
+Config.saves.maxSlotSaves = 12;
 Config.saves.maxAutoSaves = 0;
 
 /*
@@ -1108,6 +1108,7 @@ setup.manualSaves = [
 ];
 setup.replayFromSlot = null;
 setup.checkpointsPendingRefresh = new Set();
+setup.resumeSlot = 11;
 
 /**
  * 为更新前创建的存档补上新增变量。只在字段缺失时写默认值，旧玩家已经
@@ -1272,10 +1273,62 @@ setup.hasFirstNightSave = function () {
     return hasFirstNightCheckpoint || hasFirstNightManualSave;
 };
 
+/**
+ * 第二夜章节入口要求第一夜已经抵达最终认定，或曾经看到第一夜结尾。
+ * 普通早期存档只提供“继续游戏”，不会让玩家跳过尚未取得的关键线索。
+ */
+setup.hasFirstNightCompletion = function () {
+    if (!Save.browser.slot.isEnabled()) {
+        return false;
+    }
+    if (setup.isNightUnlocked(2)) {
+        return true;
+    }
+
+    const finalCheckpoint = Save.browser.slot.get(3);
+    if (finalCheckpoint && finalCheckpoint.metadata) {
+        const checkpointId = finalCheckpoint.metadata.checkpointId;
+        if (checkpointId === 'decision') {
+            return true;
+        }
+    }
+
+    return setup.getManualSaveEntries().some(({ info }) => {
+        if (!info || !info.metadata) {
+            return false;
+        }
+        return ['NightReport', 'DemoEnd'].includes(info.metadata.passage);
+    });
+};
+
+setup.hasResumePoint = function () {
+    return Save.browser.slot.isEnabled() && Save.browser.slot.has(setup.resumeSlot);
+};
+
 /** 统计自动检查点和已有主动存档，用于标题页与侧栏入口。 */
 setup.getAvailableSaveCount = function () {
     const manualCount = setup.getManualSaveEntries().filter(({ info }) => Boolean(info)).length;
     return setup.getAvailableCheckpoints().length + manualCount;
+};
+
+/** 保存当前段落作为“继续游戏”的精确位置，不显示在普通存档列表中。 */
+setup.captureResumePoint = function (passageName) {
+    if (!Save.browser.slot.isEnabled() || passageName === 'Start') {
+        return;
+    }
+
+    try {
+        Save.browser.slot.save(setup.resumeSlot, '继续游戏', {
+            resume: true,
+            night: Number(State.variables.currentNight) || 1,
+            passage: passageName,
+            evidenceCount: Array.isArray(State.variables.evidence) ? State.variables.evidence.length : 0,
+            pollution: Number(State.variables.pollution) || 0
+        });
+        setup.updateCheckpointButtons();
+    } catch (error) {
+        console.warn('最近进度保存失败：', error);
+    }
 };
 
 /** 在关键段落第一次抵达时自动保存；读早期档重走后可刷新后续检查点。 */
@@ -1405,6 +1458,10 @@ setup.loadCheckpoint = function (slot) {
 setup.continueLatestCheckpoint = function () {
     const feedback = document.querySelector('.checkpoint-feedback');
 
+    if (setup.hasResumePoint()) {
+        return setup.loadCheckpoint(setup.resumeSlot);
+    }
+
     return Save.browser.continue().then(() => {
         const loadedCheckpoint = setup.checkpoints.find((entry) => entry.passage === State.passage);
         setup.replayFromSlot = loadedCheckpoint ? loadedCheckpoint.slot : null;
@@ -1486,12 +1543,12 @@ setup.updateCheckpointButtons = function () {
 
     if (titleActions) {
         const actions = [];
-        if (count > 0) {
-            actions.push('<button id="continue-checkpoint-button" class="choice-button" type="button">继续上次进度</button>');
+        if (count > 0 || setup.hasResumePoint()) {
+            actions.push('<button id="continue-checkpoint-button" class="choice-button" type="button">继续游戏</button>');
             actions.push('<button id="title-checkpoint-button" class="choice-button secondary-choice" type="button">选择存档</button>');
         }
-        if (setup.hasFirstNightSave()) {
-            actions.push('<button id="start-night-two-button" class="choice-button secondary-choice" type="button">继续游戏（第二夜）</button>');
+        if (setup.hasFirstNightCompletion()) {
+            actions.push('<button id="start-night-two-button" class="choice-button secondary-choice" type="button">进入第二夜</button>');
         }
         titleActions.innerHTML = actions.join('');
     }
@@ -1855,7 +1912,7 @@ $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', fun
 
 // 标题页接续第二夜时只初始化第二夜变量，保留第一夜记录与所有存档。
 $(document).on('click', '#start-night-two-button', function () {
-    if (!setup.hasFirstNightSave()) {
+    if (!setup.hasFirstNightCompletion()) {
         return;
     }
     setup.prepareNightTwo();
@@ -1885,6 +1942,9 @@ $(document).on('click', '.checkpoint-close', function () {
 // 该夜自己的槽位，另一夜和三个主动档始终保留。
 $(document).on(':enginerestart', function () {
     setup.replayFromSlot = null;
+    if (Save.browser.slot.isEnabled() && Save.browser.slot.has(setup.resumeSlot)) {
+        Save.browser.slot.delete(setup.resumeSlot);
+    }
     setup.checkpointsPendingRefresh = new Set(
         setup.checkpoints.filter((checkpoint) => checkpoint.night === 1).map((checkpoint) => checkpoint.id)
     );
@@ -2046,6 +2106,8 @@ $(document).on(':passageend', function () {
     // 延后一轮事件循环，让 SugarCube 先完成当前历史节点的提交。否则在部分
     // 浏览器中，检查点内容正确但“已到达”标记仍停留在上一个历史快照。
     window.setTimeout(() => setup.captureCheckpoint(passageName), 0);
+    // 检查点保存完成后再写最近进度，避免两个命名槽同时序列化同一历史节点。
+    window.setTimeout(() => setup.captureResumePoint(passageName), 80);
 });
 
 </script><tw-passagedata pid="1" name="StoryInit" tags="" position="100,100" size="100,100">&lt;&lt;set $currentNight to 1&gt;&gt;
