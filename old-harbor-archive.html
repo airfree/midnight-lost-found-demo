@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>旧港区线路事故互助档案</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #e7e1cf;
+            --paper: #f6f1df;
+            --ink: #202820;
+            --green: #315c49;
+            --green-dark: #18382c;
+            --line: #8f927c;
+            --alert: #8c2d27;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--page);
+            font-family: SimSun, "Microsoft YaHei", sans-serif;
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        a { color: #174d81; }
+        button, input { font: inherit; }
+
+        .site-shell {
+            width: min(960px, calc(100% - 24px));
+            margin: 18px auto 40px;
+            border: 1px solid #5c6658;
+            background: var(--paper);
+            box-shadow: 0 5px 22px rgba(39, 44, 35, 0.24);
+        }
+
+        .utility-bar {
+            padding: 4px 12px;
+            color: #d8dfd6;
+            background: #1d3028;
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .site-header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 18px 22px;
+            border-bottom: 4px solid var(--green-dark);
+            background: #d5d9c4;
+        }
+
+        .seal {
+            display: grid;
+            width: 62px;
+            height: 62px;
+            flex: 0 0 62px;
+            place-items: center;
+            border: 3px double var(--green-dark);
+            border-radius: 50%;
+            color: var(--green-dark);
+            font: 700 12px/1.2 SimSun, serif;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--green-dark);
+            font-size: clamp(22px, 4vw, 34px);
+            letter-spacing: 0.08em;
+        }
+
+        .site-subtitle { margin: 3px 0 0; color: #576254; }
+
+        .main-nav {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0 12px;
+            list-style: none;
+            background: var(--green);
+        }
+
+        .main-nav a {
+            display: block;
+            padding: 8px 13px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .main-nav a:hover, .main-nav a:focus-visible { background: var(--green-dark); }
+
+        .breadcrumb {
+            padding: 8px 18px;
+            border-bottom: 1px solid #c2bea8;
+            color: #66695c;
+            background: #eeead8;
+            font-size: 13px;
+        }
+
+        main { padding: 22px; }
+
+        .shutdown-notice {
+            margin: 0 0 20px;
+            padding: 10px 12px;
+            border: 1px solid #ae8d71;
+            color: #664932;
+            background: #f4e2c8;
+        }
+
+        .search-panel {
+            padding: 16px;
+            border: 1px solid var(--line);
+            background: #ebe9d8;
+        }
+
+        .search-panel h2 { margin: 0 0 10px; font-size: 19px; }
+
+        .search-row { display: flex; gap: 8px; }
+
+        .search-row input {
+            min-width: 0;
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #747969;
+            background: #fffef4;
+        }
+
+        .archive-button {
+            padding: 8px 14px;
+            border: 1px solid var(--green-dark);
+            color: #fff;
+            background: var(--green);
+            cursor: pointer;
+        }
+
+        .archive-button:hover, .archive-button:focus-visible { background: var(--green-dark); }
+
+        .search-hint { margin: 8px 0 0; color: #65695d; font-size: 13px; }
+        .search-feedback { min-height: 1.65em; color: var(--alert); }
+
+        .results { margin-top: 24px; }
+        .results[hidden], .revision[hidden] { display: none; }
+
+        .results h2 {
+            margin: 0 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid var(--green);
+            font-size: 20px;
+        }
+
+        table { width: 100%; border-collapse: collapse; background: #fffef4; }
+        th, td { padding: 9px 10px; border: 1px solid #8f927c; text-align: left; vertical-align: top; }
+        th { color: #fff; background: #4f695b; }
+        tr:nth-child(even) td { background: #efeddd; }
+
+        .record-card {
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid #7f8574;
+            background: #fffef4;
+        }
+
+        .record-card h3 { margin: 0 0 12px; color: var(--green-dark); }
+
+        .record-grid {
+            display: grid;
+            grid-template-columns: 9em 1fr;
+            margin: 0 0 14px;
+        }
+
+        .record-grid dt, .record-grid dd {
+            margin: 0;
+            padding: 6px 8px;
+            border-bottom: 1px dotted #aaa994;
+        }
+
+        .record-grid dt { font-weight: 700; }
+
+        .revision {
+            margin-top: 14px;
+            padding: 14px;
+            border-left: 5px solid var(--alert);
+            background: #f4dfd6;
+        }
+
+        .revision strong { color: var(--alert); }
+
+        .old-comment {
+            margin: 14px 0 0;
+            padding: 10px 12px;
+            border: 1px dashed #877b67;
+            color: #50483e;
+            background: #f0ead7;
+            font-family: KaiTi, STKaiti, serif;
+        }
+
+        .sync-note { margin: 10px 0 0; color: var(--green-dark); font-weight: 700; }
+
+        footer {
+            padding: 12px 18px;
+            border-top: 1px solid #aaa994;
+            color: #6c6e63;
+            background: #dedccb;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @media (max-width: 560px) {
+            .site-shell { width: 100%; margin: 0; border-right: 0; border-left: 0; }
+            .site-header { align-items: flex-start; padding: 15px; }
+            .seal { width: 50px; height: 50px; flex-basis: 50px; font-size: 10px; }
+            main { padding: 14px; }
+            .search-row { display: grid; }
+            .archive-button { width: 100%; }
+            .record-grid { grid-template-columns: 1fr; }
+            .record-grid dt { padding-bottom: 0; border-bottom: 0; }
+            .record-grid dd { padding-top: 2px; }
+            table { font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="site-shell">
+        <div class="utility-bar">缓存节点：港七旧机房　|　最后镜像：三年前 08-02</div>
+        <header class="site-header">
+            <div class="seal" aria-hidden="true">港区<br>互助档案</div>
+            <div>
+                <h1>旧港区线路事故互助档案</h1>
+                <p class="site-subtitle">由退休线路职工与事故家属共同整理的非官方索引</p>
+            </div>
+        </header>
+        <nav aria-label="主导航">
+            <ul class="main-nav">
+                <li><a href="#search">档案查询</a></li>
+                <li><a href="#notice">停运公告</a></li>
+                <li><a href="#contact">勘误留言</a></li>
+            </ul>
+        </nav>
+        <div class="breadcrumb">首页 &gt; 事故与失踪 &gt; 线路记录查询</div>
+
+        <main>
+            <p id="notice" class="shutdown-notice"><strong>站点公告：</strong>原站已停止维护。当前页面来自旧港区机房缓存，部分附件和人员姓名可能缺失。</p>
+
+            <section id="search" class="search-panel" aria-labelledby="search-title">
+                <h2 id="search-title">线路事故记录查询</h2>
+                <form id="archive-search-form">
+                    <div class="search-row">
+                        <input id="archive-query" name="query" type="search" autocomplete="off" placeholder="输入日期、站点、线路或更正单编号" aria-describedby="search-hint search-feedback">
+                        <button class="archive-button" type="submit">开始查询</button>
+                    </div>
+                    <p id="search-hint" class="search-hint">示例：0717、长宁路、归潮末班车</p>
+                    <p id="search-feedback" class="search-feedback" aria-live="polite"></p>
+                </form>
+            </section>
+
+            <section id="results" class="results" hidden aria-labelledby="result-title">
+                <h2 id="result-title">查询结果：1 条</h2>
+                <table>
+                    <thead><tr><th>日期</th><th>线路</th><th>站点</th><th>状态</th></tr></thead>
+                    <tbody><tr><td>7月17日</td><td>归潮末班车</td><td>长宁路17号</td><td>记录已更正</td></tr></tbody>
+                </table>
+
+                <article class="record-card">
+                    <h3>事故索引 0717-02 / 缓存文本</h3>
+                    <dl class="record-grid">
+                        <dt>报修人员</dt><dd>陈启山</dd>
+                        <dt>车辆状态</dt><dd>未回场、无残骸、未注销</dd>
+                        <dt>纸质更正单</dt><dd>N-0011（签收人栏缺页）</dd>
+                        <dt>归档乘客人数</dt><dd>1 人</dd>
+                    </dl>
+                    <button id="revision-toggle" class="archive-button" type="button">查看修订记录</button>
+
+                    <div id="revision" class="revision" hidden>
+                        <strong>系统修订对照</strong>
+                        <p>原始记录：乘客人数 2 人<br>归档记录：乘客人数 1 人<br>修改时间：事故次日 04:06</p>
+                        <p>修改账号与线路排班表覆盖记录使用同一旧工号。纸质更正单编号为 N-0011，签收人栏已被撕去。</p>
+                        <blockquote class="old-comment">“那晚不是多出一个乘客，是少记了一个人。车回来时，司机座是空的。”—— 陈姓用户，三年前</blockquote>
+                        <p id="sync-note" class="sync-note">修订记录已传回值班窗口并登记为证据。</p>
+                    </div>
+                </article>
+            </section>
+        </main>
+
+        <footer id="contact">本页面为非官方缓存副本　·　联系电话与实名留言功能已停用　·　请勿提交个人资料</footer>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const form = document.getElementById('archive-search-form');
+            const query = document.getElementById('archive-query');
+            const feedback = document.getElementById('search-feedback');
+            const results = document.getElementById('results');
+            const revisionToggle = document.getElementById('revision-toggle');
+            const revision = document.getElementById('revision');
+
+            // The archive intentionally accepts several clues already present
+            // in the game, so players infer what to search without guessing one
+            // exact spelling.
+            const acceptedQueries = ['0717', '7月17日', '长宁路', '长宁路17号', '归潮', '归潮末班车', 'n-0011', 'n0011'];
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const normalized = query.value.trim().toLowerCase().replace(/\s+/g, '');
+                const matched = acceptedQueries.some(function (term) {
+                    return normalized.includes(term.toLowerCase().replace(/\s+/g, ''));
+                });
+
+                if (!matched) {
+                    results.hidden = true;
+                    feedback.textContent = '没有找到匹配记录。可以从线路日志里的日期、站点或编号开始。';
+                    query.focus();
+                    return;
+                }
+
+                feedback.textContent = '';
+                results.hidden = false;
+                results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+
+            revisionToggle.addEventListener('click', function () {
+                revision.hidden = false;
+                revisionToggle.disabled = true;
+                revisionToggle.textContent = '修订记录已展开';
+
+                // The parent validates this window before touching SugarCube
+                // state.  '*' also supports local file:// playtests, whose
+                // opaque origin cannot be expressed as a target origin string.
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'midnight-lost-found:harbor-evidence',
+                        evidence: '旧港区网页上的人数差额'
+                    }, '*');
+                } else {
+                    document.getElementById('sync-note').textContent = '已找到修订记录。请返回值班窗口继续调查。';
+                }
+            });
+        }());
+    </script>
+</body>
+</html>

@@ -633,6 +633,18 @@ input.drawer-code-input {
     color: #f1edcf;
 }
 
+.harbor-launch-status {
+    min-height: 1.7em;
+    margin: 0.65rem 0 0;
+    color: var(--muted);
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 0.82rem;
+}
+
+.harbor-launch-status.is-complete {
+    color: #b7c9aa;
+}
+
 .item-visual {
     position: relative;
     margin: 1.5rem 0 2rem;
@@ -906,6 +918,73 @@ $(document).on('click', '#evidence-log-button', function () {
 $(document).on('click', '.evidence-log-close', function () {
     Dialog.close();
     setup.playInterfaceTone(430);
+});
+
+setup.harborArchiveWindow = null;
+
+/**
+ * Register the clue only after the player reveals the revision history on the
+ * separate archive website.  Keeping this idempotent prevents duplicate
+ * evidence when the player reopens the page or clicks the record twice.
+ */
+setup.registerHarborArchiveEvidence = function () {
+    const variables = State.variables;
+    variables.harborArchiveRead = true;
+
+    if (!variables.evidence.includes('旧港区网页上的人数差额')) {
+        variables.evidence.push('旧港区网页上的人数差额');
+    }
+
+    document.querySelectorAll('.harbor-launch-status').forEach((status) => {
+        status.textContent = '档案页传回一条修订记录：原始乘客 2 人，归档后 1 人。证据已登记。';
+        status.classList.add('is-complete');
+    });
+
+    document.querySelectorAll('.open-harbor-archive').forEach((button) => {
+        button.textContent = '重新打开旧港区档案网站 ↗';
+    });
+};
+
+/**
+ * Open the fictional archive as a real, standalone web page.  If the browser
+ * blocks the user-triggered popup, fall back to the original in-game snapshot
+ * so privacy settings never make the investigation impossible to finish.
+ */
+setup.openHarborArchive = function () {
+    const archiveUrl = new URL('old-harbor-archive.html', document.baseURI).href;
+    const archiveWindow = window.open(archiveUrl, 'midnight-lost-found-harbor-archive');
+
+    if (!archiveWindow) {
+        Engine.play('HarborArchiveSite');
+        return;
+    }
+
+    setup.harborArchiveWindow = archiveWindow;
+    archiveWindow.focus();
+
+    document.querySelectorAll('.harbor-launch-status').forEach((status) => {
+        status.textContent = '档案网站已在新标签页打开。找到修订记录后再回到值班窗口。';
+    });
+};
+
+$(document).on('click', '.open-harbor-archive', function () {
+    setup.openHarborArchive();
+    setup.playInterfaceTone(455);
+});
+
+// The external clue page reports completion through postMessage.  Validate
+// both the message type and the known child window before changing game state.
+window.addEventListener('message', function (event) {
+    if (!event.data || event.data.type !== 'midnight-lost-found:harbor-evidence') {
+        return;
+    }
+
+    if (setup.harborArchiveWindow && event.source !== setup.harborArchiveWindow) {
+        return;
+    }
+
+    setup.registerHarborArchiveEvidence();
+    setup.playInterfaceTone(610);
 });
 
 /**
@@ -1202,7 +1281,7 @@ $(document).on(':passagedisplay', function () {
 &lt;&lt;if $archiveCredits &gt; 0 and !$archivesViewed.includes(&quot;camera&quot;)&gt;&gt;[[C｜公交站夜间监控摘要-&gt;ArchiveCamera]]&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archiveCredits &gt; 0 and !$archivesViewed.includes(&quot;missing&quot;)&gt;&gt;[[D｜同夜失踪人员与线路日志-&gt;ArchiveMissing]]&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archivesViewed.includes(&quot;missing&quot;) and !$clerkCallHeard&gt;&gt;[[回拨便笺上的号码-&gt;ClerkCall]]&lt;&lt;/if&gt;&gt;
-&lt;&lt;if $archivesViewed.includes(&quot;missing&quot;) and !$harborArchiveRead&gt;&gt;[[打开线路日志上被划掉的网址-&gt;HarborArchiveSite]]&lt;&lt;/if&gt;&gt;
+&lt;&lt;if $archivesViewed.includes(&quot;missing&quot;) and !$harborArchiveRead&gt;&gt;&lt;button class=&quot;choice-button open-harbor-archive&quot; type=&quot;button&quot;&gt;打开线路日志上被划掉的网址 ↗&lt;/button&gt;&lt;&lt;/if&gt;&gt;
 &lt;&lt;if $archivesViewed.length &gt; 0&gt;&gt;[[结束调阅，接待申请人-&gt;Applicants]]&lt;&lt;/if&gt;&gt;
 &lt;/div&gt;
 
@@ -1308,9 +1387,11 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;choice-list&quot;&gt;
     [[拨打便笺上的号码-&gt;ClerkCall]]
-    [[打开旧港区档案网站-&gt;HarborArchiveSite]]
+    &lt;button class=&quot;choice-button open-harbor-archive&quot; type=&quot;button&quot;&gt;打开旧港区档案网站 ↗&lt;/button&gt;
     [[返回档案目录-&gt;ArchiveHub]]
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="19" name="ClerkCall" tags="" position="1100,225" size="100,100">&lt;&lt;if !$clerkCallHeard&gt;&gt;&lt;&lt;set $clerkCallHeard to true&gt;&gt;&lt;&lt;/if&gt;&gt;
+&lt;/div&gt;
+
+&lt;p class=&quot;harbor-launch-status&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;</tw-passagedata><tw-passagedata pid="19" name="ClerkCall" tags="" position="1100,225" size="100,100">&lt;&lt;if !$clerkCallHeard&gt;&gt;&lt;&lt;set $clerkCallHeard to true&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;&lt;if !$evidence.includes(&quot;老许提到的蓝纸乘客&quot;)&gt;&gt;&lt;&lt;run $evidence.push(&quot;老许提到的蓝纸乘客&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
 &lt;div class=&quot;eyebrow&quot;&gt;呼出电话 / 长宁路夜班清洁&lt;/div&gt;
 &lt;h2&gt;老许还没睡&lt;/h2&gt;
@@ -1346,10 +1427,13 @@ $(document).on(':passagedisplay', function () {
 
 &lt;div class=&quot;choice-list&quot;&gt;
     [[返回档案目录-&gt;ArchiveHub]]
-&lt;/div&gt;</tw-passagedata><tw-passagedata pid="21" name="HarborArchiveSite" tags="" position="100,350" size="100,100">&lt;&lt;set $harborArchiveRead to true&gt;&gt;
+&lt;/div&gt;</tw-passagedata><tw-passagedata pid="21" name="HarborArchiveSite" tags="" position="100,350" size="100,100">&lt;!-- 浏览器拦截新标签页时才进入此备用段落，避免玩家因弹窗策略而丢失主线证据。 --&gt;
+&lt;&lt;set $harborArchiveRead to true&gt;&gt;
 &lt;&lt;if !$evidence.includes(&quot;旧港区网页上的人数差额&quot;)&gt;&gt;&lt;&lt;run $evidence.push(&quot;旧港区网页上的人数差额&quot;)&gt;&gt;&lt;&lt;/if&gt;&gt;
-&lt;div class=&quot;eyebrow&quot;&gt;本地网页 / 旧港区档案互助站&lt;/div&gt;
+&lt;div class=&quot;eyebrow&quot;&gt;内置快照 / 旧港区档案互助站&lt;/div&gt;
 &lt;h2&gt;已停止更新的事故索引&lt;/h2&gt;
+
+&lt;p class=&quot;warning-copy&quot;&gt;浏览器拦截了独立档案页，系统改为显示保存在值班电脑里的文字快照。&lt;/p&gt;
 
 &lt;section class=&quot;harbor-archive&quot;&gt;
 &lt;header class=&quot;harbor-archive-header&quot;&gt;港区线路互助档案　/　缓存副本　/　最后更新：三年前&lt;/header&gt;
