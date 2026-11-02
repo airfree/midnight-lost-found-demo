@@ -1082,9 +1082,9 @@ input.drawer-code-input {
  * change save behavior or create an excessive history footprint.
  */
 Config.history.maxStates = 80;
-// 前四个槽位用于自动检查点，后三个槽位用于玩家主动存档。槽位数量保持
-// 克制，既方便尝试多结局，也避免玩家面对一整页难以辨认的存档。
-Config.saves.maxSlotSaves = 7;
+// 第一夜自动档使用0—3，三个主动档继续使用4—6，第二夜自动档使用7—10。
+// 主动档位置保持不变，保证更新前已经保存的记录可以原样读取。
+Config.saves.maxSlotSaves = 11;
 Config.saves.maxAutoSaves = 0;
 
 /*
@@ -1096,10 +1096,10 @@ setup.checkpoints = [
     { id: 'interview', night: 1, slot: 1, passage: 'InterviewHub', label: '第一夜｜开始核对证词' },
     { id: 'confrontation', night: 1, slot: 2, passage: 'EvidenceBoard', label: '第一夜｜正式对质前' },
     { id: 'decision', night: 1, slot: 3, passage: 'OwnershipDecision', label: '第一夜｜最终认定前' },
-    { id: 'night2-inspection', night: 2, slot: 0, passage: 'Night2InspectionHub', label: '第二夜｜开始检查旧手机' },
-    { id: 'night2-interview', night: 2, slot: 1, passage: 'Night2InterviewHub', label: '第二夜｜申请人到场后' },
-    { id: 'night2-confrontation', night: 2, slot: 2, passage: 'Night2EvidenceBoard', label: '第二夜｜提交推理前' },
-    { id: 'night2-decision', night: 2, slot: 3, passage: 'Night2OwnershipDecision', label: '第二夜｜最终认定前' }
+    { id: 'night2-inspection', night: 2, slot: 7, passage: 'Night2InspectionHub', label: '第二夜｜开始检查旧手机' },
+    { id: 'night2-interview', night: 2, slot: 8, passage: 'Night2InterviewHub', label: '第二夜｜申请人到场后' },
+    { id: 'night2-confrontation', night: 2, slot: 9, passage: 'Night2EvidenceBoard', label: '第二夜｜提交推理前' },
+    { id: 'night2-decision', night: 2, slot: 10, passage: 'Night2OwnershipDecision', label: '第二夜｜最终认定前' }
 ];
 setup.manualSaves = [
     { slot: 4, label: '主动存档一' },
@@ -1107,6 +1107,49 @@ setup.manualSaves = [
     { slot: 6, label: '主动存档三' }
 ];
 setup.replayFromSlot = null;
+setup.checkpointsPendingRefresh = new Set();
+
+/**
+ * 为更新前创建的存档补上新增变量。只在字段缺失时写默认值，旧玩家已经
+ * 收集的证据、污染、选择和主动档内容都不会被重置。
+ */
+setup.ensureStateDefaults = function (variables) {
+    const defaults = {
+        currentNight: 1,
+        inventory: [],
+        pollutionWarningShown: false,
+        night2InspectionCredits: 3,
+        night2Inspections: [],
+        night2ArchiveCredits: 2,
+        night2ArchivesViewed: [],
+        night2QuestionCredits: 4,
+        night2QuestionsAsked: [],
+        night2Theory: '尚未提交',
+        night2CaseScore: 0,
+        night2FieldChoice: '',
+        night2OwnerDecision: '',
+        night2Disposition: '',
+        night2OutcomeTitle: '',
+        night2OutcomeSummary: '',
+        night2TokenFound: false,
+        night2OutsideUnlocked: false,
+        night2WentOutside: false,
+        night2DryPackUsed: false,
+        night2FutureCallerKnown: false,
+        night2LoopClosed: false
+    };
+
+    Object.entries(defaults).forEach(([key, value]) => {
+        if (typeof variables[key] === 'undefined') {
+            variables[key] = clone(value);
+        }
+    });
+};
+
+// 读取旧命名存档时，先修改存档快照再交给 SugarCube 恢复。
+Save.onLoad.add(function (save) {
+    save.state.history.forEach((moment) => setup.ensureStateDefaults(moment.variables));
+});
 
 // SugarCube 的活动变量与历史节点分开维护：段落内刚获得的证据要到下一次
 // 跳转才会进入历史。主动保存时把活动变量写回当前历史节点，确保原地读档
@@ -1131,13 +1174,13 @@ setup.escapeCheckpointText = function (value) {
         .replaceAll("'", '&#39;');
 };
 
-/** 返回当前浏览器中已经存在的第一夜检查点。 */
+/** 返回当前浏览器中已经存在的两夜自动检查点。 */
 setup.getAvailableCheckpoints = function () {
     if (!Save.browser.slot.isEnabled()) {
         return [];
     }
 
-    return [0, 1, 2, 3].flatMap((slot) => {
+    return [0, 1, 2, 3, 7, 8, 9, 10].flatMap((slot) => {
         const info = Save.browser.slot.get(slot);
         if (!info) {
             return [];
@@ -1160,6 +1203,44 @@ setup.unlockNight = function (night) {
 
 setup.isNightUnlocked = function (night) {
     return storage.has(`night-${night}-unlocked`) && storage.get(`night-${night}-unlocked`) === true;
+};
+
+/**
+ * 旧玩家可从标题直接进入第二夜。仅重置第二夜自己的临时变量，不清空
+ * 第一夜证据、污染、违规，也不删除任何自动档或主动档。
+ */
+setup.prepareNightTwo = function () {
+    setup.ensureStateDefaults(State.variables);
+    Object.assign(State.variables, {
+        currentNight: 2,
+        shiftTime: '00:00',
+        inventory: [],
+        pollutionWarningShown: false,
+        night2InspectionCredits: 3,
+        night2Inspections: [],
+        night2ArchiveCredits: 2,
+        night2ArchivesViewed: [],
+        night2QuestionCredits: 4,
+        night2QuestionsAsked: [],
+        night2Theory: '尚未提交',
+        night2CaseScore: 0,
+        night2FieldChoice: '',
+        night2OwnerDecision: '',
+        night2Disposition: '',
+        night2OutcomeTitle: '',
+        night2OutcomeSummary: '',
+        night2TokenFound: false,
+        night2OutsideUnlocked: false,
+        night2WentOutside: false,
+        night2DryPackUsed: false,
+        night2FutureCallerKnown: false,
+        night2LoopClosed: false
+    });
+    setup.unlockNight(2);
+    setup.replayFromSlot = null;
+    setup.checkpointsPendingRefresh = new Set(
+        setup.checkpoints.filter((checkpoint) => checkpoint.night === 2).map((checkpoint) => checkpoint.id)
+    );
 };
 
 /** 返回三个主动存档槽及其当前内容，空槽也保留以便玩家写入。 */
@@ -1199,6 +1280,7 @@ setup.captureCheckpoint = function (passageName) {
         // 即使复用相同槽位也必须写入新的夜次状态。
         if (
             existingCheckpointId === checkpoint.id
+            && !setup.checkpointsPendingRefresh.has(checkpoint.id)
             && (!Number.isInteger(setup.replayFromSlot) || checkpoint.slot <= setup.replayFromSlot)
         ) {
             return;
@@ -1214,6 +1296,7 @@ setup.captureCheckpoint = function (passageName) {
             pollution: Number(State.variables.pollution) || 0
         });
         setup.replayFromSlot = checkpoint.slot;
+        setup.checkpointsPendingRefresh.delete(checkpoint.id);
         setup.showCheckpointNotice(`已自动存档：${checkpoint.label}`);
         setup.updateCheckpointButtons();
     } catch (error) {
@@ -1275,13 +1358,13 @@ setup.saveManual = function (slot) {
     });
 };
 
-/** 新周目只清除自动检查点，玩家主动保存的路线仍然保留。 */
+/** 仅供玩家明确要求重置时使用；主动档4—6永远不会被此函数删除。 */
 setup.clearAutoCheckpoints = function () {
     if (!Save.browser.slot.isEnabled()) {
         return;
     }
 
-    [0, 1, 2, 3].forEach((slot) => {
+    [0, 1, 2, 3, 7, 8, 9, 10].forEach((slot) => {
         if (Save.browser.slot.has(slot)) {
             Save.browser.slot.delete(slot);
         }
@@ -1390,9 +1473,10 @@ setup.updateCheckpointButtons = function () {
             actions.push('<button id="continue-checkpoint-button" class="choice-button" type="button">继续上次进度</button>');
             actions.push('<button id="title-checkpoint-button" class="choice-button secondary-choice" type="button">选择存档</button>');
         }
-        if (setup.isNightUnlocked(2)) {
-            actions.push('<button id="start-night-two-button" class="choice-button secondary-choice" type="button">从第二夜开始</button>');
-        }
+        const nightTwoLabel = setup.isNightUnlocked(2)
+            ? '从第二夜开始'
+            : '已玩第一夜，直接开始第二夜';
+        actions.push(`<button id="start-night-two-button" class="choice-button secondary-choice" type="button">${nightTwoLabel}</button>`);
         titleActions.innerHTML = actions.join('');
     }
 
@@ -1753,16 +1837,9 @@ $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', fun
     setup.playInterfaceTone(540);
 });
 
-// 标题页直接进入第二夜时执行一次干净初始化；从第一夜结尾进入则保留跨夜证据。
+// 标题页直接进入第二夜时只初始化第二夜变量，保留第一夜记录与所有存档。
 $(document).on('click', '#start-night-two-button', function () {
-    State.variables.currentNight = 2;
-    State.variables.shiftTime = '00:00';
-    State.variables.inventory = [];
-    State.variables.evidence = [];
-    State.variables.pollution = 0;
-    State.variables.violations = 0;
-    setup.clearAutoCheckpoints();
-    setup.replayFromSlot = null;
+    setup.prepareNightTwo();
     Engine.play('Night2Arrival');
 });
 
@@ -1785,10 +1862,18 @@ $(document).on('click', '.checkpoint-close', function () {
     setup.playInterfaceTone(430);
 });
 
-// “重新值班”只重置自动检查点；玩家主动保存的旧路线继续保留。
+// 重新值班不再自动删除任何存档。进入对应检查点时，新周目的状态会写入
+// 该夜自己的槽位，另一夜和三个主动档始终保留。
 $(document).on(':enginerestart', function () {
-    setup.clearAutoCheckpoints();
     setup.replayFromSlot = null;
+    setup.checkpointsPendingRefresh = new Set(
+        setup.checkpoints.filter((checkpoint) => checkpoint.night === 1).map((checkpoint) => checkpoint.id)
+    );
+});
+
+// passageinit 发生在段落与侧栏宏求值之前，可避免旧存档缺少新变量时报错。
+$(document).on(':passageinit', function () {
+    setup.ensureStateDefaults(State.variables);
 });
 
 setup.harborArchiveWindow = null;
@@ -2007,7 +2092,7 @@ $(document).on(':passageend', function () {
 &lt;div class=&quot;sidebar-utilities&quot;&gt;
     &lt;!-- 证据簿只读取本周目已经取得的证据，不消耗调查次数，也不会切换当前段落。 --&gt;
     &lt;button id=&quot;evidence-log-button&quot; class=&quot;utility-button evidence-log-button&quot; type=&quot;button&quot; aria-haspopup=&quot;dialog&quot;&gt;证据簿（$evidence.length）&lt;/button&gt;
-    &lt;button id=&quot;inventory-button&quot; class=&quot;utility-button inventory-button&quot; type=&quot;button&quot; aria-haspopup=&quot;dialog&quot;&gt;物品栏（$inventory.length）&lt;/button&gt;
+    &lt;button id=&quot;inventory-button&quot; class=&quot;utility-button inventory-button&quot; type=&quot;button&quot; aria-haspopup=&quot;dialog&quot;&gt;物品栏（&lt;&lt;if Array.isArray($inventory)&gt;&gt;$inventory.length&lt;&lt;else&gt;&gt;0&lt;&lt;/if&gt;&gt;）&lt;/button&gt;
     &lt;!-- 四个命名检查点会在关键剧情段落自动写入，不需要玩家手动维护。 --&gt;
     &lt;button id=&quot;checkpoint-menu-button&quot; class=&quot;utility-button checkpoint-menu-button&quot; type=&quot;button&quot; aria-haspopup=&quot;dialog&quot;&gt;值班存档（0）&lt;/button&gt;
     &lt;button id=&quot;sound-toggle&quot; class=&quot;utility-button&quot; type=&quot;button&quot; aria-pressed=&quot;false&quot;&gt;音效：关&lt;/button&gt;
