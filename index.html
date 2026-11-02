@@ -1448,14 +1448,15 @@ setup.clearAutoCheckpoints = function () {
 };
 
 /** 载入指定槽位；标题页读取失败时也必须给玩家可见反馈。 */
-setup.loadCheckpoint = function (slot, options) {
+setup.loadCheckpoint = async function (slot, options) {
     const settings = options || {};
     const feedback = document.querySelector('.checkpoint-feedback');
 
-    return Save.browser.slot.load(slot).then(() => {
+    try {
+        await Save.browser.slot.load(slot);
         setup.replayFromSlot = slot;
         return true;
-    }).catch((error) => {
+    } catch (error) {
         if (feedback) {
             feedback.textContent = `读取失败：${error.message}`;
         }
@@ -1464,7 +1465,7 @@ setup.loadCheckpoint = function (slot, options) {
         }
         console.warn(`存档槽 ${slot} 读取失败：`, error);
         return false;
-    });
+    }
 };
 
 /**
@@ -1486,8 +1487,14 @@ setup.continueLatestCheckpoint = async function () {
     namedSlots.forEach(({ slot }) => candidates.push(slot));
 
     for (const slot of candidates) {
-        // eslint-disable-next-line no-await-in-loop -- fallback必须按时间顺序逐个验证。
-        const loaded = await setup.loadCheckpoint(slot, { silent: true });
+        let loaded = false;
+        try {
+            // eslint-disable-next-line no-await-in-loop -- fallback必须按时间顺序逐个验证。
+            loaded = await setup.loadCheckpoint(slot, { silent: true });
+        } catch (error) {
+            // 兼容外部拦截器或旧版包装层同步抛错，继续尝试下一份记录。
+            console.warn(`存档槽 ${slot} 读取过程异常：`, error);
+        }
         if (loaded) {
             return true;
         }
@@ -1934,7 +1941,22 @@ $(document).on('click', '#checkpoint-menu-button, #title-checkpoint-button', fun
 });
 
 $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', function () {
-    setup.continueLatestCheckpoint();
+    const button = this;
+    button.disabled = true;
+    button.textContent = '正在读取存档…';
+    setup.continueLatestCheckpoint().then((loaded) => {
+        if (!loaded && button.isConnected) {
+            button.disabled = false;
+            button.textContent = '继续游戏';
+        }
+    }).catch((error) => {
+        console.error('继续游戏失败：', error);
+        setup.showCheckpointNotice(`继续游戏失败：${error.message}`);
+        if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = '继续游戏';
+        }
+    });
     setup.playInterfaceTone(540);
 });
 
@@ -1948,7 +1970,19 @@ $(document).on('click', '#start-night-two-button', function () {
 });
 
 $(document).on('click', '.checkpoint-entry, .manual-load-button', function () {
-    setup.loadCheckpoint(Number(this.dataset.checkpointSlot));
+    const button = this;
+    button.disabled = true;
+    setup.loadCheckpoint(Number(button.dataset.checkpointSlot)).then((loaded) => {
+        if (!loaded && button.isConnected) {
+            button.disabled = false;
+        }
+    }).catch((error) => {
+        console.error('读取存档失败：', error);
+        setup.showCheckpointNotice(`读取存档失败：${error.message}`);
+        if (button.isConnected) {
+            button.disabled = false;
+        }
+    });
     setup.playInterfaceTone(540);
 });
 
