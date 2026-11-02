@@ -1206,7 +1206,7 @@ setup.isNightUnlocked = function (night) {
 };
 
 /**
- * 旧玩家可从标题直接进入第二夜。仅重置第二夜自己的临时变量，不清空
+ * 旧玩家可从标题承接第一夜继续游戏。仅重置第二夜自己的临时变量，不清空
  * 第一夜证据、污染、违规，也不删除任何自动档或主动档。
  */
 setup.prepareNightTwo = function () {
@@ -1474,8 +1474,8 @@ setup.updateCheckpointButtons = function () {
             actions.push('<button id="title-checkpoint-button" class="choice-button secondary-choice" type="button">选择存档</button>');
         }
         const nightTwoLabel = setup.isNightUnlocked(2)
-            ? '从第二夜开始'
-            : '已玩第一夜，直接开始第二夜';
+            ? '继续游戏（第二夜）'
+            : '继续游戏（接续第二夜）';
         actions.push(`<button id="start-night-two-button" class="choice-button secondary-choice" type="button">${nightTwoLabel}</button>`);
         titleActions.innerHTML = actions.join('');
     }
@@ -1837,7 +1837,7 @@ $(document).on('click', '#continue-checkpoint-button, .checkpoint-continue', fun
     setup.playInterfaceTone(540);
 });
 
-// 标题页直接进入第二夜时只初始化第二夜变量，保留第一夜记录与所有存档。
+// 标题页接续第二夜时只初始化第二夜变量，保留第一夜记录与所有存档。
 $(document).on('click', '#start-night-two-button', function () {
     setup.prepareNightTwo();
     Engine.play('Night2Arrival');
@@ -3814,7 +3814,7 @@ $(document).on(':passageend', function () {
     &lt;h1&gt;凌晨失物处&lt;/h1&gt;
     &lt;p class=&quot;subtitle&quot;&gt;“今日全部失物已处理完毕。现开始处理最后一件失物。”&lt;/p&gt;
     &lt;div class=&quot;choice-list&quot;&gt;
-        &lt;&lt;link &quot;继续第二夜&quot;&gt;&gt;&lt;&lt;set $currentNight to 2&gt;&gt;&lt;&lt;goto &quot;Night2Arrival&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
+        &lt;&lt;link &quot;继续游戏&quot;&gt;&gt;&lt;&lt;set $currentNight to 2&gt;&gt;&lt;&lt;goto &quot;Night2Arrival&quot;&gt;&gt;&lt;&lt;/link&gt;&gt;
         &lt;!-- Engine.restart() 会清除本周目的历史与全部故事变量，再重新执行 StoryInit。
              不能使用普通的 Start 链接，否则真相、污染、违规等状态会被带入下一轮。 --&gt;
         &lt;&lt;link &quot;重新值班&quot;&gt;&gt;&lt;&lt;run Engine.restart()&gt;&gt;&lt;&lt;/link&gt;&gt;
