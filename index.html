@@ -1457,7 +1457,7 @@ setup.loadCheckpoint = async function (slot, options) {
     try {
         const slotInfo = Save.browser.slot.get(slot);
         const expectedPassage = slotInfo && slotInfo.metadata && slotInfo.metadata.passage;
-        const loadPromise = Save.browser.slot.load(slot);
+        const loadPromise = setup.readSaveSlot(slot);
         const loadResult = await Promise.race([
             loadPromise,
             new Promise((resolve) => {
@@ -1502,6 +1502,11 @@ setup.loadCheckpoint = async function (slot, options) {
             window.clearTimeout(timeoutId);
         }
     }
+};
+
+/** SugarCube 命名槽读取入口；独立封装也便于验证移动端挂起时的恢复路径。 */
+setup.readSaveSlot = function (slot) {
+    return Save.browser.slot.load(slot);
 };
 
 /**
