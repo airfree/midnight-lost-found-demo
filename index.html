@@ -1451,11 +1451,28 @@ setup.clearAutoCheckpoints = function () {
 setup.loadCheckpoint = async function (slot, options) {
     const settings = options || {};
     const feedback = document.querySelector('.checkpoint-feedback');
+    const timeoutMs = 3500;
+    let timeoutId;
 
     try {
         const slotInfo = Save.browser.slot.get(slot);
         const expectedPassage = slotInfo && slotInfo.metadata && slotInfo.metadata.passage;
-        await Save.browser.slot.load(slot);
+        const loadPromise = Save.browser.slot.load(slot);
+        const loadResult = await Promise.race([
+            loadPromise,
+            new Promise((resolve) => {
+                timeoutId = window.setTimeout(() => resolve(null), timeoutMs);
+            })
+        ]);
+
+        if (loadResult === null) {
+            // Some embedded/mobile browsers leave the save promise pending after
+            // restoring SugarCube state. Trust it only when the saved passage is
+            // already active; otherwise stop waiting and try the next save slot.
+            if (!expectedPassage || State.passage !== expectedPassage) {
+                throw new Error(`读取等待超过${timeoutMs / 1000}秒，存档状态未恢复`);
+            }
+        }
 
         // 某些旧版/嵌入式浏览器会恢复变量但不完成 SugarCube 的段落导航。
         // 用存档元数据明确跳到原段落，确保“继续”与“读取”产生可见的场景切换。
@@ -1480,6 +1497,10 @@ setup.loadCheckpoint = async function (slot, options) {
         }
         console.warn(`存档槽 ${slot} 读取失败：`, error);
         return false;
+    } finally {
+        if (timeoutId) {
+            window.clearTimeout(timeoutId);
+        }
     }
 };
 
