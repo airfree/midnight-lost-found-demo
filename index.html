@@ -1115,6 +1115,9 @@ setup.resumeSlot = 11;
  * 收集的证据、污染、选择和主动档内容都不会被重置。
  */
 setup.ensureStateDefaults = function (variables) {
+    if (!variables || typeof variables !== 'object') {
+        return;
+    }
     const defaults = {
         currentNight: 1,
         inventory: [],
@@ -1149,7 +1152,10 @@ setup.ensureStateDefaults = function (variables) {
 
 // 读取旧命名存档时，先修改存档快照再交给 SugarCube 恢复。
 Save.onLoad.add(function (save) {
-    save.state.history.forEach((moment) => setup.ensureStateDefaults(moment.variables));
+    if (!save || !save.state || !Array.isArray(save.state.history)) {
+        return;
+    }
+    save.state.history.forEach((moment) => setup.ensureStateDefaults(moment && moment.variables));
 });
 
 // SugarCube 的活动变量与历史节点分开维护：段落内刚获得的证据要到下一次
@@ -1441,35 +1447,57 @@ setup.clearAutoCheckpoints = function () {
     });
 };
 
-/** 载入指定槽位，并把失败原因显示在存档弹窗内。 */
-setup.loadCheckpoint = function (slot) {
+/** 载入指定槽位；标题页读取失败时也必须给玩家可见反馈。 */
+setup.loadCheckpoint = function (slot, options) {
+    const settings = options || {};
     const feedback = document.querySelector('.checkpoint-feedback');
 
     return Save.browser.slot.load(slot).then(() => {
         setup.replayFromSlot = slot;
+        return true;
     }).catch((error) => {
         if (feedback) {
             feedback.textContent = `读取失败：${error.message}`;
         }
+        if (!settings.silent) {
+            setup.showCheckpointNotice(`读取失败：${error.message}`);
+        }
+        console.warn(`存档槽 ${slot} 读取失败：`, error);
+        return false;
     });
 };
 
-/** 继续时间最新的检查点。 */
-setup.continueLatestCheckpoint = function () {
-    const feedback = document.querySelector('.checkpoint-feedback');
-
+/**
+ * 继续游戏优先读取精确最近进度。若该隐藏槽因旧版本升级或浏览器写入中断
+ * 而损坏，则删除的只有隐藏槽，并按保存时间尝试玩家可见的命名存档。
+ */
+setup.continueLatestCheckpoint = async function () {
+    const candidates = [];
     if (setup.hasResumePoint()) {
-        return setup.loadCheckpoint(setup.resumeSlot);
+        candidates.push(setup.resumeSlot);
     }
 
-    return Save.browser.continue().then(() => {
-        const loadedCheckpoint = setup.checkpoints.find((entry) => entry.passage === State.passage);
-        setup.replayFromSlot = loadedCheckpoint ? loadedCheckpoint.slot : null;
-    }).catch((error) => {
-        if (feedback) {
-            feedback.textContent = `暂无可继续的存档：${error.message}`;
+    const namedSlots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        .flatMap((slot) => {
+            const info = Save.browser.slot.get(slot);
+            return info ? [{ slot, date: info.date ? new Date(info.date).getTime() : 0 }] : [];
+        })
+        .sort((left, right) => right.date - left.date);
+    namedSlots.forEach(({ slot }) => candidates.push(slot));
+
+    for (const slot of candidates) {
+        // eslint-disable-next-line no-await-in-loop -- fallback必须按时间顺序逐个验证。
+        const loaded = await setup.loadCheckpoint(slot, { silent: true });
+        if (loaded) {
+            return true;
         }
-    });
+        if (slot === setup.resumeSlot && Save.browser.slot.has(slot)) {
+            Save.browser.slot.delete(slot);
+        }
+    }
+
+    setup.showCheckpointNotice('未能读取现有进度。请打开“选择存档”尝试其他记录。');
+    return false;
 };
 
 /** 打开自动检查点与主动存档列表；所有内容只读取当前浏览器的 SugarCube 存储。 */
